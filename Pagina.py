@@ -2,11 +2,12 @@ import pickle
 import streamlit as st
 import requests
 import pandas as pd
+import streamlit.components.v1 as components
 
 modo_oscuro = st.toggle("🌙 Modo oscuro", value=True)
 
 if modo_oscuro:
-    fondo_color = "#2b2b2b"
+    fondo_color = "#1e1e1e"
     texto_color = "#ffffff"
 else:
     fondo_color = "#f0f0f0"
@@ -22,176 +23,166 @@ st.markdown(f"""
             background-color: {'#000' if modo_oscuro else '#d9d9d9'};
             color: {texto_color};
         }}
-    </style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-    <style>
-        /* Fondo general */
-        .stApp {
-            background: linear-gradient(135deg, #1f1c2c, #928dab);
-            color: #ffffff;
-            font-family: 'Segoe UI', sans-serif;
-        }
-
-        /* Encabezado principal */
-        h1 {
-            color: #FFFFFF;
-            text-align: center;
-            font-size: 40px !important;
-        }
-
-        /* Títulos de las películas */
-        .movie-title {
+        .movie-title {{
             color: #45a29e;
             font-size: 18px;
             text-align: center;
-        }
-
-        /* Botón */
-        div.stButton > button {
-            background-color: #000000;
-            color: white;
-            border-radius: 10px;
-            height: 50px;
-            width: 250px;
-            font-size: 18px;
-        }
-
-        div.stButton > button:hover {
-            background: linear-gradient(135deg, #4F4459, #9D68BD);
-            color: black;
-        }
-
-         div[data-baseweb="select"] > div {
-            background-color: #000000;
-            color: #FFFFFF ;
-            border: 2px solid #45a29e ;
-            border-radius: 10px;
-            font-size: 18px;
-        }
-            
-        ul[role="listbox"] li {
-            background-color: #000000;
-            color: white;
-            font-size: 16px ;
-        }
-            
-        img {
+        }}
+        img {{
             border-radius: 10px;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
-
-        }
-            
-        img:hover {
+            cursor: pointer;
+        }}
+        img:hover {{
             transform: scale(1.05);
             box-shadow: 0px 0px 15px #8A2BE2;
-
-        [data-testid="stSidebar"] {
-            background-color: #111;
-            color: #eee;
-            padding: 20px;
-            font-size: 18px;
-            border-right: 2px solid #8A2BE2;
-        }
+        }}
     </style>
 """, unsafe_allow_html=True)
 
 def fetch_poster(movie_id):
-    url = "https://api.themoviedb.org/3/movie/{}?api_key=8265bd1679663a7ea12ac168da84d2e8&language=en-US".format(movie_id)
-    
-    data= requests.get(url)
-
-    data = data.json()
-
-    poster_path = data ['poster_path']
-
-    full_path = "https://Image.tmdb.org/t/p/w500/" + poster_path
-
-    return full_path
+    url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key=8265bd1679663a7ea12ac168da84d2e8&language=es-ES"
+    data = requests.get(url).json()
+    poster_path = data.get('poster_path', '')
+    return f"https://image.tmdb.org/t/p/w500/{poster_path}" if poster_path else ""
 
 def fetch_genre(movie_id):
-    """
-    Devuelve los géneros de una película desde TMDB.
-    """
-    url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key=8265bd1679663a7ea12ac168da84d2e8&language=en-US"
-    response = requests.get(url)
+    url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key=8265bd1679663a7ea12ac168da84d2e8&language=es-ES"
+    data = requests.get(url).json()
+    genres = data.get("genres", [])
+    return ", ".join([g["name"] for g in genres]) if genres else "Desconocido"
 
-    if response.status_code != 200:
-        return "Desconocido"
-
-    data = response.json()
-    if "genres" in data and isinstance(data["genres"], list) and len(data["genres"]) > 0:
-        return ", ".join([genre["name"] for genre in data["genres"]])
-    else:
-        return "Desconocido"
+def fetch_overview(movie_id):
+    url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key=8265bd1679663a7ea12ac168da84d2e8&language=es-ES"
+    data = requests.get(url).json()
+    return data.get("overview", "Sin sinopsis disponible.")
 
 def recommend(movie):
-    
     index = movies[movies['title'] == movie].index[0]
-
     distances = sorted(list(enumerate(similarity[index])), reverse=True, key=lambda x: x[1])
 
-    recommended_movie_names = []
-    recommended_movie_posters = []
-    recommended_movie_similarity = []
-    recommended_movie_genres = []
-
+    names, posters, sims, genres, ids = [], [], [], [], []
     for i in distances[1:num_recs + 1]:
         movie_id = movies.iloc[i[0]].movie_id
-        nombre = movies.iloc[i[0]].title
-        poster = fetch_poster(movie_id)
-        genre = fetch_genre(movie_id)
-
-        recommended_movie_names.append(nombre)
-        recommended_movie_posters.append(poster)
-        recommended_movie_similarity.append(i[1])
-        recommended_movie_genres.append(genre)
-
-    return recommended_movie_names, recommended_movie_posters, recommended_movie_similarity, recommended_movie_genres
-
-
+        ids.append(movie_id)
+        names.append(movies.iloc[i[0]].title)
+        posters.append(fetch_poster(movie_id))
+        sims.append(i[1])
+        genres.append(fetch_genre(movie_id))
+    return names, posters, sims, genres, ids
 
 with st.sidebar:
-    st.header("StreamWise ")
-    st.subheader("Mejor recomendacion al elegir qué ver.")
+    st.header("🎬 StreamWise")
     st.image('https://cdn.hobbyconsolas.com/sites/navi.axelspringer.es/public/media/image/2016/06/607612-proximas-peliculas-pixar-despues-buscando-dory.jpg?tf=1200x')
-    st.write('¿Cansado de pasar más tiempo buscando qué ver que disfrutando una película? Nuestro sistema inteligente analiza tus gustos y te recomienda películas hechas para ti. Así, elegir qué ver será tan fácil como presionar play.')
-    st.write('Grupo de Proyecto')
-    st.write('Juan Sebastian Toro')
-    st.write('Juan David Aguilera')
-    st.write('Juan Manuel Patarroyo')
-    st.write('Tania Alejandra Rojas')
-
+    st.write('Recomendaciones personalizadas según tus gustos cinematográficos.')
+    st.write('👥 Grupo del Proyecto:')
+    st.write('Juan Sebastián Toro\nJuan David Aguilera\nJuan Manuel Patarroyo\nTania Alejandra Rojas')
 
 st.header('Sistema de recomendación🎞️🎬')
 st.subheader("Descubre películas similares según tus gustos 🎥")
-movies = pd.read_pickle('movie_list.pkl') 
+
+movies = pd.read_pickle('movie_list.pkl')
 similarity = pd.read_pickle('similarity.pkl')
 
-movie_list = movies ['title'].values
-selected_movie = st.selectbox(
-    "Selecciona una película de la lista", 
-    movie_list
-)
+movie_list = movies['title'].values
+selected_movie = st.selectbox("Selecciona una película de la lista", movie_list)
 
-import streamlit as st
-
-num_recs = st.slider(
-    "🎞️ Cantidad de recomendaciones a mostrar", 
-    min_value=5, 
-    max_value=20, 
-    value=10, 
-    step=1
-)
+num_recs = st.slider("🎞️ Cantidad de recomendaciones a mostrar", 5, 20, 10)
 
 if st.button('Mostrar Recomendaciones'):
-    recommended_movie_names, recommended_movie_posters, recommended_movie_similarity, recommended_movie_genres = recommend (selected_movie)
-    
+    names, posters, sims, genres, ids = recommend(selected_movie)
     cols = st.columns(5)
-    for i, col in enumerate(cols * (len(recommended_movie_names)//5 + 1)):
-        if i < len(recommended_movie_names):
-            col.text(recommended_movie_names[i])
-            col.image(recommended_movie_posters[i])
-            col.text(f"⭐ {recommended_movie_similarity[i] * 100:.1f}%")
-            col.text(f"🎭 {recommended_movie_genres[i]}")
+
+    for i, col in enumerate(cols * ((len(names) // 5) + 1)):
+        if i < len(names):
+            with col:
+                st.markdown(f"<div class='movie-title'>{names[i]}</div>", unsafe_allow_html=True)
+                overview = fetch_overview(ids[i])
+                genre = genres[i]
+
+                # Crear bloque HTML interactivo con sinopsis ampliada
+                html_code = f"""
+                <html>
+                <head>
+                <style>
+                    .poster {{
+                        border-radius: 10px;
+                        cursor: pointer;
+                        transition: transform 0.3s ease, box-shadow 0.3s ease;
+                    }}
+                    .poster:hover {{
+                        transform: scale(1.05);
+                        box-shadow: 0 0 15px #8A2BE2;
+                    }}
+                    .overlay {{
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background-color: rgba(0, 0, 0, 0.8);
+                        display: none;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 999;
+                    }}
+                    .sinopsis-box {{
+                        background-color: #1e1e1e;
+                        color: white;
+                        width: 70%;
+                        max-height: 80%;
+                        overflow-y: auto;
+                        padding: 30px;
+                        border-radius: 15px;
+                        border: 2px solid #8A2BE2;
+                        box-shadow: 0 0 20px rgba(0,0,0,0.7);
+                        font-family: 'Segoe UI';
+                        text-align: justify;
+                    }}
+                    .close-btn {{
+                        background-color: #8A2BE2;
+                        color: white;
+                        border: none;
+                        padding: 10px 20px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        margin-top: 20px;
+                    }}
+                    .close-btn:hover {{
+                        background-color: #A85BEA;
+                    }}
+                </style>
+                </head>
+                <body>
+                    <img id="poster{i}" src="{posters[i]}" width="180" class="poster">
+                    <div id="overlay{i}" class="overlay">
+                        <div class="sinopsis-box">
+                            <h2 style="text-align:center;">{names[i]}</h2>
+                            <p><b>🎭 Género:</b> {genre}</p>
+                            <p>{overview}</p>
+                            <div style="text-align:center;">
+                                <button class="close-btn" id="close{i}">Cerrar</button>
+                            </div>
+                        </div>
+                    </div>
+                    <script>
+                        var overlay = document.getElementById("overlay{i}");
+                        var img = document.getElementById("poster{i}");
+                        var closeBtn = document.getElementById("close{i}");
+                        img.onclick = function() {{
+                            overlay.style.display = "flex";
+                        }}
+                        closeBtn.onclick = function() {{
+                            overlay.style.display = "none";
+                        }}
+                        window.onclick = function(event) {{
+                            if (event.target == overlay) {{
+                                overlay.style.display = "none";
+                            }}
+                        }}
+                    </script>
+                </body>
+                </html>
+                """
+                components.html(html_code, height=300)
+                st.text(f"⭐ {sims[i]*100:.1f}%")
